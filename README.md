@@ -64,28 +64,50 @@ See `MODULE_CONTRACT.md` for exactly what a module repo needs to provide.
 ## Quickstart
 
 ```bash
-git clone https://github.com/<you>/rydberg.git
-cd rydberg
+git clone https://github.com/getRydberg/Rydberg.git
+cd Rydberg
 cp .env.example .env        # fill in BASE_DOMAIN and your Cloudflare tunnel token
 
+# put `rydberg` on your PATH (one-time, needs sudo for /usr/local/bin)
+sudo ./bin/rydberg self-install
+
+# check everything's ready
+rydberg doctor
+
 # install whichever modules you want
-bin/rydberg install dashboard https://github.com/<you>/rydberg-dashboard.git main
+rydberg install dashboard https://github.com/getRydberg/rydberg-dashboard.git main
 
 # see what's installed
-bin/rydberg list
+rydberg list
 
 # start everything
-bin/rydberg up
+rydberg up
 ```
+
+From here on you run `rydberg <command>` from anywhere on the machine —
+no need to `cd` back into this repo or type `bin/rydberg`. Since it's a
+symlink to this repo's script, `git pull` keeps it current automatically.
+
+Don't want it on your system PATH? Skip `self-install` and just keep
+using `bin/rydberg <command>` from inside this folder — everything above
+works identically either way.
 
 To pull the latest version of a module:
 ```bash
-bin/rydberg update dashboard
+rydberg update dashboard
 ```
 
 To remove one entirely:
 ```bash
-bin/rydberg remove dashboard
+rydberg remove dashboard
+```
+
+Other useful commands:
+```bash
+rydberg status                    # what's running
+rydberg logs backend -f           # follow one service's logs
+rydberg restart backend           # restart just one service after a change
+rydberg up --profile inference    # also start optional/heavy services (e.g. vLLM)
 ```
 
 ## Routing and TLS

@@ -17,7 +17,11 @@
 #
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Resolve the real location of this script, following symlinks (needed
+# since `self-install` symlinks this file to somewhere like /usr/local/bin —
+# without this, ROOT would resolve to /usr/local instead of the repo).
+SOURCE="$(readlink -f "${BASH_SOURCE[0]}")"
+ROOT="$(cd "$(dirname "$SOURCE")/.." && pwd)"
 APPS_DIR="$ROOT/apps"
 REGISTRY="$ROOT/modules.list"
 GENERATED="$ROOT/docker-compose.generated.yml"
