@@ -1,11 +1,14 @@
 services:
   cloudflared:
     image: cloudflare/cloudflared:latest
-    container_name: rydberg-cloudflared
+    container_name: rydberg-tunnel
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    profiles:
+      - full
+    # The token is read from your .env file.
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - frontend
     networks:
       - rydberg-net
 
