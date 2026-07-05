@@ -111,15 +111,33 @@ generate_compose() {
 
 cmd_up() {
   generate_compose
+  # --profile is a top-level `docker compose` flag and must come BEFORE
+  # the `up` subcommand, not after — separate it out from plain service
+  # name arguments, which DO belong after `up -d`.
+  local top_flags=() svc_args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --profile) top_flags+=("--profile" "${2:?--profile needs a value}"); shift 2 ;;
+      --profile=*) top_flags+=("$1"); shift ;;
+      *) svc_args+=("$1"); shift ;;
+    esac
+  done
   echo "Generated $GENERATED:"
   cat "$GENERATED"
   echo
-  docker compose -f "$GENERATED" up -d "$@"
+  docker compose -f "$GENERATED" "${top_flags[@]}" up -d "${svc_args[@]}"
 }
 
 cmd_down() {
   [ -f "$GENERATED" ] || { echo "Nothing to stop (no generated compose file)."; exit 0; }
-  docker compose -f "$GENERATED" down
+  # With no args, default to ALL profiles ("*") so `rydberg down` actually
+  # stops everything, not just profile-less services like cloudflared.
+  # Pass your own --profile to target a subset instead.
+  local flags=("$@")
+  if [ "${#flags[@]}" -eq 0 ]; then
+    flags=(--profile "*")
+  fi
+  docker compose -f "$GENERATED" "${flags[@]}" down --remove-orphans
 }
 
 cmd_restart() {
@@ -214,7 +232,7 @@ case "${1:-}" in
   update)  shift; cmd_update "$@" ;;
   list)    cmd_list ;;
   up)      shift; cmd_up "$@" ;;
-  down)    cmd_down ;;
+  down)    shift; cmd_down "$@" ;;
   restart) shift; cmd_restart "$@" ;;
   status)  cmd_status ;;
   logs)    shift; cmd_logs "$@" ;;
