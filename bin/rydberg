@@ -8,6 +8,12 @@
 #   rydberg list                             Show installed modules
 #   rydberg up [<name>...]                   Generate compose + start (all, or named subset)
 #   rydberg down                             Stop everything
+#   rydberg restart [<name>...]              Restart everything, or named service(s)
+#   rydberg status                           Show container status (docker compose ps)
+#   rydberg logs <name> [-f]                 Tail logs for one service (-f to follow)
+#   rydberg doctor                           Check prerequisites (docker, network, .env)
+#   rydberg self-install [path]              Symlink this script onto your PATH
+#                                            (default: /usr/local/bin/rydberg)
 #
 set -euo pipefail
 
@@ -112,6 +118,91 @@ cmd_down() {
   docker compose -f "$GENERATED" down
 }
 
+cmd_restart() {
+  [ -f "$GENERATED" ] || { echo "Nothing running yet — run 'rydberg up' first."; exit 1; }
+  if [ "$#" -eq 0 ]; then
+    docker compose -f "$GENERATED" restart
+  else
+    docker compose -f "$GENERATED" restart "$@"
+  fi
+}
+
+cmd_status() {
+  [ -f "$GENERATED" ] || { echo "Nothing running yet — run 'rydberg up' first."; exit 0; }
+  docker compose -f "$GENERATED" ps
+}
+
+cmd_logs() {
+  local name="${1:?service name required (see: rydberg status)}"; shift || true
+  [ -f "$GENERATED" ] || { echo "Nothing running yet — run 'rydberg up' first."; exit 1; }
+  docker compose -f "$GENERATED" logs "$name" "$@"
+}
+
+cmd_doctor() {
+  local ok=1
+  echo "Checking prerequisites..."
+
+  if command -v docker >/dev/null 2>&1; then
+    echo "  [ok] docker is installed ($(docker --version))"
+  else
+    echo "  [FAIL] docker not found — install Docker first"
+    ok=0
+  fi
+
+  if docker compose version >/dev/null 2>&1; then
+    echo "  [ok] docker compose is available"
+  else
+    echo "  [FAIL] docker compose not found (need the compose plugin, v2+)"
+    ok=0
+  fi
+
+  if docker network inspect rydberg-net >/dev/null 2>&1; then
+    echo "  [ok] rydberg-net network exists"
+  else
+    echo "  [warn] rydberg-net network not found — create it with:"
+    echo "         docker network create rydberg-net"
+  fi
+
+  if [ -f "$ROOT/.env" ]; then
+    echo "  [ok] .env exists"
+  else
+    echo "  [warn] no .env found — copy .env.example to .env and fill it in"
+  fi
+
+  if [ -s "$REGISTRY" ]; then
+    echo "  [ok] $(wc -l < "$REGISTRY" | tr -d ' ') module(s) registered"
+  else
+    echo "  [warn] no modules installed yet — see: rydberg install"
+  fi
+
+  if [ "$ok" -eq 1 ]; then
+    echo "Looks good."
+  else
+    echo "Fix the FAIL items above before running 'rydberg up'."
+    exit 1
+  fi
+}
+
+cmd_self_install() {
+  local target="${1:-/usr/local/bin/rydberg}"
+  local src="$ROOT/bin/rydberg"
+  if [ -e "$target" ] && [ "$(readlink -f "$target" 2>/dev/null)" != "$src" ]; then
+    echo "Something already exists at $target and isn't a link to this script."
+    echo "Remove it first, or pass a different target: rydberg self-install <path>"
+    exit 1
+  fi
+  if ln -sf "$src" "$target" 2>/dev/null; then
+    echo "Linked $target -> $src"
+    echo "You can now run 'rydberg' from anywhere. Try: rydberg doctor"
+  else
+    echo "Could not write to $target (needs sudo?). Try:"
+    echo "  sudo ln -sf \"$src\" \"$target\""
+    echo "...or install to somewhere on your PATH you own, e.g.:"
+    echo "  mkdir -p ~/.local/bin && ln -sf \"$src\" ~/.local/bin/rydberg"
+    exit 1
+  fi
+}
+
 # --- dispatch -------------------------------------------------------------
 case "${1:-}" in
   install) shift; cmd_install "$@" ;;
@@ -120,5 +211,10 @@ case "${1:-}" in
   list)    cmd_list ;;
   up)      shift; cmd_up "$@" ;;
   down)    cmd_down ;;
+  restart) shift; cmd_restart "$@" ;;
+  status)  cmd_status ;;
+  logs)    shift; cmd_logs "$@" ;;
+  doctor)  cmd_doctor ;;
+  self-install) shift; cmd_self_install "$@" ;;
   *) usage ;;
 esac

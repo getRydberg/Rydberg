@@ -64,12 +64,12 @@ See `MODULE_CONTRACT.md` for exactly what a module repo needs to provide.
 ## Quickstart
 
 ```bash
-git clone https://github.com/getRydberg/Rydberg.git
+git clone https://github.com/<you>/rydberg.git
 cd rydberg
 cp .env.example .env        # fill in BASE_DOMAIN and your Cloudflare tunnel token
 
-# install whichever modules you want eg) Dashboard
-bin/rydberg install dashboard https://github.com/getRydberg/rydberg-dashboard.git main
+# install whichever modules you want
+bin/rydberg install dashboard https://github.com/<you>/rydberg-dashboard.git main
 
 # see what's installed
 bin/rydberg list
@@ -106,11 +106,3 @@ either; if you're allergic to a terminal, this probably isn't for you yet.
 It's for people who want their own server and are willing to run a few
 commands to get one, without also wanting to become a full-time systems
 administrator just to add a second app.
-
-
-## License
-
-  [AGPL-3.0](LICENSE) — if you run a modified version of this as a
-  network service, you're required to make your modified source
-  available to users interacting with it. See the LICENSE file for
-  full terms.
