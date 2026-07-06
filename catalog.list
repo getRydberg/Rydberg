@@ -1,0 +1,6 @@
+# Official Rydberg modules — name, git URL, default ref.
+# `rydberg install <name>` looks up entries here so you don't need to
+# paste a URL for anything official. Third-party/custom modules still
+# work by passing a URL explicitly: rydberg install <name> <url> [ref]
+dashboard https://github.com/getRydberg/rydberg-dashboard.git main
+portfolio https://github.com/getRydberg/rydberg-portfolio.git main

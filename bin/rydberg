@@ -2,7 +2,9 @@
 # rydberg — install and run Rydberg modules from a thin core repo.
 #
 # Usage:
-#   rydberg install <name> <git-url> [ref]   Clone a module into apps/<name>
+#   rydberg install <name> [git-url] [ref]   Install an official module by name,
+#                                            or a custom one by URL
+#   rydberg catalog                          List official modules you can install by name
 #   rydberg remove <name>                    Remove a module
 #   rydberg update [<name>]                  git pull one module, or all
 #   rydberg list                             Show installed modules
@@ -24,10 +26,11 @@ SOURCE="$(readlink -f "${BASH_SOURCE[0]}")"
 ROOT="$(cd "$(dirname "$SOURCE")/.." && pwd)"
 APPS_DIR="$ROOT/apps"
 REGISTRY="$ROOT/modules.list"
+CATALOG="$ROOT/catalog.list"
 GENERATED="$ROOT/docker-compose.generated.yml"
 
 mkdir -p "$APPS_DIR"
-touch "$REGISTRY"
+touch "$REGISTRY" "$CATALOG"
 
 usage() {
   sed -n '2,10p' "$0"
@@ -57,15 +60,64 @@ registry_list() {
   done < "$REGISTRY"
 }
 
+catalog_lookup() {
+  local name="$1"
+  grep "^$name " "$CATALOG" 2>/dev/null | head -1
+}
+
+cmd_catalog() {
+  [ -s "$CATALOG" ] || { echo "Catalog is empty."; return; }
+  echo "Official modules (install with: rydberg install <name>):"
+  printf "%-15s %-55s %s\n" "NAME" "REPO" "REF"
+  grep -v '^#' "$CATALOG" | grep -v '^\s*$' | while read -r name url ref; do
+    printf "%-15s %-55s %s\n" "$name" "$url" "$ref"
+  done
+}
+
 # --- commands -----------------------------------------------------------
 cmd_install() {
-  local name="${1:?module name required}" url="${2:?git url required}" ref="${3:-main}"
+  local name="${1:?module name required}"
+  local url="${2:-}"
+  local ref="${3:-main}"
+
+  if [ -z "$url" ]; then
+    local found
+    found="$(catalog_lookup "$name")"
+    if [ -z "$found" ]; then
+      echo "'$name' isn't an official module and no URL was given."
+      echo "See official modules: rydberg catalog"
+      echo "Or install a custom one: rydberg install <name> <git-url> [ref]"
+      exit 1
+    fi
+    url="$(echo "$found" | awk '{print $2}')"
+    ref="$(echo "$found" | awk '{print $3}')"
+    [ -n "$ref" ] || ref="main"
+  fi
+
   if [ -d "$APPS_DIR/$name" ]; then
     echo "Module '$name' already installed at apps/$name. Use 'rydberg update $name' instead."
     exit 1
   fi
   echo "Cloning $url (ref: $ref) into apps/$name ..."
   git clone --branch "$ref" --single-branch "$url" "$APPS_DIR/$name"
+
+  # If the module declares its own canonical name (.rydberg-module file at
+  # its root), check it matches what you installed it as — catches typos
+  # like installing "portfolio" from a repo that actually calls itself
+  # something else, before it causes confusing profile/routing mismatches.
+  local declared_file="$APPS_DIR/$name/.rydberg-module"
+  if [ -f "$declared_file" ]; then
+    local declared
+    declared="$(tr -d '[:space:]' < "$declared_file")"
+    if [ -n "$declared" ] && [ "$declared" != "$name" ]; then
+      echo "  [warn] this module calls itself '$declared' in .rydberg-module,"
+      echo "         but you installed it as '$name'. Its compose profiles"
+      echo "         likely use '$declared' — you may need:"
+      echo "           rydberg up $declared"
+      echo "         instead of '$name', or reinstall using the declared name."
+    fi
+  fi
+
   registry_add "$name" "$url" "$ref"
   echo "Installed '$name'. Run 'rydberg up' to include it."
 }
@@ -112,20 +164,41 @@ generate_compose() {
 cmd_up() {
   generate_compose
   # --profile is a top-level `docker compose` flag and must come BEFORE
-  # the `up` subcommand, not after — separate it out from plain service
-  # name arguments, which DO belong after `up -d`.
-  local top_flags=() svc_args=()
+  # the `up` subcommand. Separate it from plain name arguments.
+  local top_flags=() name_args=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --profile) top_flags+=("--profile" "${2:?--profile needs a value}"); shift 2 ;;
       --profile=*) top_flags+=("$1"); shift ;;
-      *) svc_args+=("$1"); shift ;;
+      *) name_args+=("$1"); shift ;;
     esac
   done
+
+  # Split plain name arguments into "known installed module" (treated as
+  # a profile to activate — e.g. `rydberg up dashboard`) vs. anything else
+  # (treated as a literal compose service name, forwarded after `up -d`).
+  local module_flags=() svc_args=()
+  for arg in "${name_args[@]}"; do
+    if grep -q "^$arg " "$REGISTRY" 2>/dev/null; then
+      module_flags+=("--profile" "$arg")
+    else
+      svc_args+=("$arg")
+    fi
+  done
+
+  # No specific module named -> default to EVERY installed module, so a
+  # bare `rydberg up` actually starts what you've installed, not just
+  # profile-less core infra like cloudflared.
+  if [ "${#module_flags[@]}" -eq 0 ] && [ "${#svc_args[@]}" -eq 0 ]; then
+    while read -r name _url _ref; do
+      module_flags+=("--profile" "$name")
+    done < "$REGISTRY"
+  fi
+
   echo "Generated $GENERATED:"
   cat "$GENERATED"
   echo
-  docker compose -f "$GENERATED" "${top_flags[@]}" up -d "${svc_args[@]}"
+  docker compose -f "$GENERATED" "${module_flags[@]}" "${top_flags[@]}" up -d "${svc_args[@]}"
 }
 
 cmd_down() {
@@ -228,6 +301,7 @@ cmd_self_install() {
 # --- dispatch -------------------------------------------------------------
 case "${1:-}" in
   install) shift; cmd_install "$@" ;;
+  catalog) cmd_catalog ;;
   remove)  shift; cmd_remove "$@" ;;
   update)  shift; cmd_update "$@" ;;
   list)    cmd_list ;;

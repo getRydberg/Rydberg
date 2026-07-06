@@ -51,15 +51,18 @@ Docker Compose to include it alongside whatever else is installed.
 
 ```
 rydberg/                    (this repo — the core)
-├── bin/rydberg               the CLI
+├── bin/rydberg               the CLI (run as rydberg once self-installed)
 ├── compose/
 │   └── cloudflared.yml       shared routing, always present
+├── catalog.list               official modules, installable by name alone
 ├── apps/                     installed modules land here (gitignored)
 ├── modules.list               registry of what's installed
-└── docker-compose.generated.yml   written by `rydberg up`, don't edit by hand
+└── docker-compose.generated.yml   written by rydberg up, don't edit by hand
 ```
 
-See `MODULE_CONTRACT.md` for exactly what a module repo needs to provide.
+See `MODULE_CONTRACT.md` for exactly what a module repo needs to provide —
+including the `.rydberg-module` name file and naming convention that let
+multiple modules coexist without collisions.
 
 ## Quickstart
 
@@ -69,19 +72,35 @@ cd Rydberg
 cp .env.example .env        # fill in BASE_DOMAIN and your Cloudflare tunnel token
 
 # put `rydberg` on your PATH (one-time, needs sudo for /usr/local/bin)
-sudo ./bin/rydberg self-install
+sudo bin/rydberg self-install
 
 # check everything's ready
 rydberg doctor
 
-# install whichever modules you want
-rydberg install dashboard https://github.com/getRydberg/rydberg-dashboard.git main
+# see what's officially available
+rydberg catalog
+
+# install by name — no URL needed for official modules
+rydberg install dashboard
 
 # see what's installed
 rydberg list
 
-# start everything
+# start everything you've installed
 rydberg up
+```
+
+`rydberg up` with no arguments starts every module you've installed —
+not everything that exists, just what's actually on this instance. Name
+a specific module to start only that one (`rydberg up dashboard`), or
+add `--profile <extra>` to also enable an optional sub-profile a module
+defines (e.g. `rydberg up --profile inference` for a heavy optional
+service like local LLM inference).
+
+Installing something that isn't in the official catalog just needs a
+URL, same as always:
+```bash
+rydberg install my-custom-thing https://github.com/you/my-module.git main
 ```
 
 From here on you run `rydberg <command>` from anywhere on the machine —

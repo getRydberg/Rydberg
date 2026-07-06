@@ -11,7 +11,7 @@ few things to be true.
    database) — whatever your module actually needs.
 
 2. **Every service must join the external `rydberg-net` network:**
-   ```yaml
+```yaml
    services:
      your-service:
        # ...
@@ -21,7 +21,7 @@ few things to be true.
    networks:
      rydberg-net:
        external: true
-   ```
+```
    This is how your module becomes reachable by Cloudflare Tunnel (or any
    other reverse proxy pointed at the same network) and how it can reach
    other modules by service name, if it ever needs to.
@@ -30,6 +30,33 @@ few things to be true.
    Reference `${SOME_VAR}` in your compose file; document what you need in
    your own `.env.example`. The core repo's `.env` is not shared with
    modules automatically — each module manages its own.
+
+4. **Include a `.rydberg-module` file** at your repo root, containing
+   exactly one line: your module's canonical name (e.g. `dashboard`,
+   `portfolio`). This is the single source of truth for "what is this
+   module called" — everything else (profiles, naming) derives from it.
+   `rydberg install` checks it and warns if you install under a different
+   name than the module declares.
+
+5. **Naming convention — every service in your compose file follows:**
+
+   | Thing | Pattern | Example |
+   |---|---|---|
+   | Service key (the YAML key under `services:`) | `<feature>-<module_name>` | `frontend-portfolio`, `backend-dashboard` |
+   | `container_name:` | `rydberg-<feature>-<module_name>` | `rydberg-frontend-portfolio`, `rydberg-backend-dashboard` |
+   | `profiles:` | `[<module_name>]` (plus any extra sub-profiles your module defines, e.g. `inference`) | `profiles: [dashboard]` |
+
+   `<module_name>` must exactly match what's in your `.rydberg-module` file.
+   `<feature>` is whatever role the service plays (`frontend`, `backend`,
+   `worker`, `db`, `vllm`, etc.) — pick something short and descriptive.
+
+   This exists because Compose's `include:` merges services by name across
+   every included file. Two modules that both name a service `frontend`
+   don't stay separate — Compose silently merges them into one, inheriting
+   fields from whichever file was included first. That produces confusing,
+   hard-to-diagnose bugs (a service that "depends on" something from a
+   totally different module). Namespacing every service key by module name
+   makes collisions structurally impossible.
 
 ## Strongly recommended
 
@@ -62,7 +89,7 @@ few things to be true.
 - Modify your compose file
 - Share a database or network namespace beyond `rydberg-net`
 - Auto-install a module's dependencies on your behalf
-- Assume anything about your internals beyond the two points above
+- Assume anything about your internals beyond what's listed above
 
 If you're building a module and something about this contract doesn't fit
 your use case, that's worth raising as an issue on the core repo — the
