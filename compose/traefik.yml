@@ -1,0 +1,20 @@
+services:
+  traefik:
+    image: traefik:v3.1
+    container_name: rydberg-traefik
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=rydberg-net"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - rydberg-net
+
+networks:
+  rydberg-net:
+    external: true

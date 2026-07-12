@@ -2,4 +2,7 @@
 # `rydberg install <name>` looks up entries here so you don't need to
 # paste a URL for anything official. Third-party/custom modules still
 # work by passing a URL explicitly: rydberg install <name> <url> [ref]
+
+
 dashboard git@github.com:getRydberg/rydberg-dashboard.git main
+bridge git@github.com:getRydberg/rydberg-bridge.git main
