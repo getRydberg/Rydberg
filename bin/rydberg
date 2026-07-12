@@ -198,7 +198,7 @@ cmd_up() {
   echo "Generated $GENERATED:"
   cat "$GENERATED"
   echo
-  docker compose -f "$GENERATED" "${module_flags[@]}" "${top_flags[@]}" up -d "${svc_args[@]}"
+  docker compose -f "$GENERATED" "${module_flags[@]}" "${top_flags[@]}" up -d --build "${svc_args[@]}"
 }
 
 cmd_down() {
