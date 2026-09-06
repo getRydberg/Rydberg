@@ -6,3 +6,5 @@
 
 dashboard git@github.com:getRydberg/rydberg-dashboard.git main
 bridge git@github.com:getRydberg/rydberg-bridge.git main
+switch git@github.com:getRydberg/rydberg-switch.git main
+pdf git@github.com:getRydberg/rydberg-pdf.git main
